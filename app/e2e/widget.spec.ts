@@ -310,6 +310,12 @@ test('hover stays stationary and pointer-down movement drags immediately without
   try {
     const w = await record(app, page)
     const widget = w.getByTestId('widget')
+    const meterAndGap = () => w.getByTestId('widget-wave').evaluate((meter: HTMLCanvasElement) => {
+      const box = meter.getBoundingClientRect()
+      const timer = meter.nextElementSibling!.getBoundingClientRect()
+      return [meter.width / devicePixelRatio, meter.height / devicePixelRatio, box.width, Math.round(timer.left - box.right)]
+    })
+    await expect.poll(meterAndGap).toEqual([15, 16, 27, 12])
     // the pill hugs its content: the same space at both ends
     // measured once it settles: the pill resizes to its timer and animates there; 13 is 12 inside the 1px border
     await expect.poll(() => widget.evaluate(el => { const r = el.getBoundingClientRect(), a = el.querySelector('.widget-details > :first-child')!.getBoundingClientRect(), z = el.querySelector('[data-testid=widget-time]')!.getBoundingClientRect(); return [Math.round(a.left - r.left), Math.round(r.right - z.right)] })).toEqual([13, 13])
@@ -320,6 +326,7 @@ test('hover stays stationary and pointer-down movement drags immediately without
     const preview = await windowOf(app, '#widget')
     await expect(w.getByTestId('widget')).toHaveAttribute('data-open', 'true')
     await expect(preview.getByTestId('widget-preview')).toBeVisible()
+    await expect.poll(meterAndGap).toEqual([15, 16, 27, 12])
     expect((await snap(app)).bounds).toEqual(before)
     await expect(preview.getByTestId('widget-preview-text')).not.toHaveText('Listening for speech…', { timeout: 30_000 })
     // Hover movement alone is never a drag.

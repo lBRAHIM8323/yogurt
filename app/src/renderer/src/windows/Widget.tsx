@@ -109,7 +109,7 @@ function Recording({ view }: { view: WidgetView }) {
     aria-label={t('Open {title}', { title: view.title })} title={view.note?.text ?? t('Recording {title}', { title: view.title })}>
     <div className="widget-details" aria-hidden="true">
       <span className="text-[var(--pill-accent)]">{view.note ? <TriangleAlert data-testid="widget-warning" size={18} /> : <Logo size={18} />}</span>
-      <LevelBars testId="widget-wave" height={16} className="text-[var(--pill-accent)]" />
+      <LevelBars testId="widget-wave" height={16} bars={3} className="box-content pl-[12px] text-[var(--pill-accent)]" />
       <span data-testid="widget-time" className="widget-time">{time}</span>
     </div>
     <Preview view={view} open={hover.open} />

@@ -18,9 +18,9 @@ describe('microphone meter', () => {
     const wave = new Wave()
     wave.target = micLevel({ me: .30, them: .79 })
     wave.step(100)
-    for (const [bars, height] of [[3, 14], [5, 16]] as const) {
-      const plan = barPlan({ bars, level: wave.level, paused: false, reduced: false })
-      expect(3 + Math.round(Math.max(...plan.heights) * (height - 3))).toBe(bars === 3 ? 10 : 11)
+    for (const height of [14, 16]) {
+      const plan = barPlan({ bars: 3, level: wave.level, paused: false, reduced: false }, wave.levels)
+      expect(3 + Math.round(Math.max(...plan.heights) * (height - 3))).toBe(height === 14 ? 10 : 11)
     }
     expect(micLevel({ me: .1, them: .79 })).toBe(0)
   })
@@ -40,7 +40,7 @@ describe('microphone meter', () => {
     expect(quiet.heights).toEqual([0, 0, 0, 0, 0])
     expect(quiet.alpha.every(a => a > 0 && a < .6)).toBe(true)
   })
-  it('fits the note control in three bars while preserving the live center and quiet pause', () => {
+  it('fits the note and floating controls in three bars while preserving the live center and quiet pause', () => {
     expect(barPlan({ level: 1, reduced: false, paused: false, bars: 3 }).heights).toEqual([.75, 1, .75])
     expect(barPlan({ level: 1, reduced: false, paused: true, bars: 3 }).heights).toEqual([0, 0, 0])
   })
