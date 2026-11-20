@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { barPlan, frameKey, micLevel, Wave } from '../../../shared/wave'
+import { barPlan, frameKey, micLevel, RECORDING_METER_MOTION, Wave } from '../../../shared/wave'
 
 const BAR_W = 3, GAP = 3
 
@@ -12,7 +12,7 @@ export function LevelBars({ height, className, testId, paused = false, bars = 5,
   useEffect(() => {
     const c = canvas.current
     if (!c) return
-    const wave = new Wave()
+    const wave = new Wave(bars, bars === 3 ? RECORDING_METER_MOTION : 'symmetric')
     const mq = reducedQuery()
     const dpr = window.devicePixelRatio || 1
     let reduced = mq.matches
@@ -24,6 +24,7 @@ export function LevelBars({ height, className, testId, paused = false, bars = 5,
       const ctx = c.getContext('2d')
       if (!ctx) return
       const plan = barPlan({ reduced, paused, level: wave.level, bars, stillBars }, wave.levels)
+      if (wave.motion === 'travelling' && document.documentElement.dir === 'rtl') plan.heights.reverse()
       // the same pixels as the last frame: nothing new for the compositor
       const key = frameKey(plan, height - BAR_W)
       if (!force && key === drawn) return
@@ -45,7 +46,7 @@ export function LevelBars({ height, className, testId, paused = false, bars = 5,
     let levelAt = performance.now()
     const off = window.yogurt.widget.onLevel((lv) => {
       wave.target = micLevel(lv); levelAt = performance.now()
-      if (reduced) { wave.levels.fill(wave.target); draw() } else if (wave.target > 0) wake()
+      if (reduced) { wave.snap(wave.target); draw() } else if (wave.target > 0) wake()
     })
     let raf = 0, last = performance.now()
     // tests read whether the loop runs; set only when that changes

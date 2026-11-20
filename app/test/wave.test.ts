@@ -14,14 +14,13 @@ describe('microphone meter', () => {
     expect(micLevel({ me: -1, them: 0 })).toBe(0)
     expect(micLevel({ me: 2, them: 0 })).toBe(1)
   })
-  it('shows a quiet 100 ms syllable on both meters without lifting silence', () => {
-    const wave = new Wave()
+  it.each(['symmetric', 'travelling'] as const)('shows a quiet syllable in both three-bar meters in %s motion', motion => {
+    const wave = new Wave(3, motion)
     wave.target = micLevel({ me: .30, them: .79 })
     wave.step(100)
-    for (const height of [14, 16]) {
-      const plan = barPlan({ bars: 3, level: wave.level, paused: false, reduced: false }, wave.levels)
-      expect(3 + Math.round(Math.max(...plan.heights) * (height - 3))).toBe(height === 14 ? 10 : 11)
-    }
+    const plan = barPlan({ bars: 3, level: wave.level, paused: false, reduced: false }, wave.levels)
+    const heights = [14, 16].map(height => 3 + Math.round(Math.max(...plan.heights) * (height - 3)))
+    expect(heights).toEqual(motion === 'symmetric' ? [10, 11] : [9, 11])
     expect(micLevel({ me: .1, them: .79 })).toBe(0)
   })
   it('uses a 50 ms attack and an eased 190 ms release', () => {
@@ -84,8 +83,9 @@ describe('microphone meter', () => {
     expect(right).toBeLessThan(centre)
     expect(outerRight).toBeLessThan(right)
     for (const bars of [3, 5] as const) {
-      const plan = () => barPlan({ reduced: false, paused: false, level: w.level, bars }, w.levels)
-      const live = plan()
+      const wave = new Wave(bars)
+      wave.target = 1; wave.step(50)
+      const live = barPlan({ reduced: false, paused: false, level: wave.level, bars }, wave.levels)
       expect(live.heights).toHaveLength(bars)
       expect(live.heights[bars >> 1]).toBe(w.level)
       expect(live.heights[0]).toBeLessThan(live.heights[bars - 1])
@@ -101,9 +101,38 @@ describe('microphone meter', () => {
     expect(w.settled()).toBe(true)
     expect(w.levels).toEqual([0, 0, 0, 0, 0])
   })
-  it('follows the same speech at 30, 60 and 120 Hz', () => {
+  it('passes both edges of a syllable from right to left, 24 ms per bar', () => {
+    const w = new Wave(3, 'travelling')
+    w.target = 1
+    w.step(12)
+    const first = 1 - Math.exp(-12 / 50)
+    expect(w.levels[2]).toBeCloseTo(first, 12)
+    expect(w.levels.slice(0, 2)).toEqual([0, 0])
+    w.target = 0
+    w.step(12)
+    expect(w.levels.slice(0, 2)).toEqual([0, 0])
+    expect(w.settled()).toBe(false)
+    w.step(12)
+    expect(w.levels[1]).toBeCloseTo(first, 12)
+    expect(w.levels[0]).toBe(0)
+    w.step(24)
+    expect(w.levels[0]).toBeCloseTo(first, 12)
+    expect(w.levels[1]).toBeCloseTo(first * Math.exp(-24 / 190), 12)
+    expect(w.levels[2]).toBeCloseTo(first * Math.exp(-48 / 190), 12)
+    w.step(2000)
+    expect(w.settled()).toBe(true)
+    expect(w.levels).toEqual([0, 0, 0])
+  })
+  it('keeps a steady level and static dots when reduced motion changes', () => {
+    const w = new Wave(3, 'travelling')
+    w.target = .7; w.snap(.7)
+    w.step(8)
+    expect(w.levels).toEqual([.7, .7, .7])
+    expect(barPlan({ bars: 3, level: w.level, reduced: true, paused: false }, w.levels).heights).toEqual([0, 0, 0])
+  })
+  it.each(['symmetric', 'travelling'] as const)('follows the same speech at 30, 60 and 120 Hz in %s motion', motion => {
     function response(frames: number) {
-      const w = new Wave()
+      const w = new Wave(3, motion)
       for (const target of [.72, .22, .89, 0]) {
         w.target = target
         for (let i = 0; i < frames; i++) w.step(100 / frames)

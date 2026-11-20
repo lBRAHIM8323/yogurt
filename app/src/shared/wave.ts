@@ -7,25 +7,62 @@ export function formatElapsed(ms: number): string {
 }
 
 const ATTACK_MS = 50, RELEASE_MS = 190
-// A syllable reaches the centre first. Its neighbours follow the same mic reading.
 const FOLLOW_MS = [28, 14, 0, 9, 22]
+const BAR_DELAY_MS = 24
+type MeterMotion = 'symmetric' | 'travelling'
+export const RECORDING_METER_MOTION: MeterMotion = 'travelling'
 
-/** Smooth the 10 Hz capture feed without delaying it behind a scrolling history. */
+function approach(from: number, target: number, ms: number, followMs = 0) {
+  const tau = (target > from ? ATTACK_MS : RELEASE_MS) + followMs
+  return from + (target - from) * -Math.expm1(-ms / tau)
+}
+
 export class Wave {
   target = 0
-  readonly levels = FOLLOW_MS.map(() => 0)
-  get level() { return this.levels[2] }
+  readonly levels: number[]
+  private time = 0
+  private changes: { at: number; from: number; target: number }[] = []
+
+  constructor(bars: 3 | 5 = 5, readonly motion: MeterMotion = 'symmetric') {
+    this.levels = Array(bars).fill(0)
+  }
+  get level() {
+    const index = this.motion === 'travelling' ? this.levels.length - 1 : Math.floor(this.levels.length / 2)
+    return this.levels[index]
+  }
   step(dtMs: number) {
+    if (this.motion === 'symmetric') {
+      const offset = this.levels.length === 3 ? 1 : 0
+      for (let i = 0; i < this.levels.length; i++) {
+        this.levels[i] = approach(this.levels[i], this.target, dtMs, FOLLOW_MS[i + offset])
+      }
+      return
+    }
+
+    // Each bar samples the same microphone envelope one delay behind its neighbour.
+    if (this.changes[0]?.target !== this.target) {
+      this.changes.unshift({ at: this.time, from: this.level, target: this.target })
+    }
+    this.time += dtMs
+    const oldest = this.time - (this.levels.length - 1) * BAR_DELAY_MS
     for (let i = 0; i < this.levels.length; i++) {
-      const delta = this.target - this.levels[i]
-      const tau = (delta > 0 ? ATTACK_MS : RELEASE_MS) + FOLLOW_MS[i]
-      this.levels[i] += delta * -Math.expm1(-dtMs / tau)
+      const at = oldest + i * BAR_DELAY_MS
+      const change = this.changes.find(c => c.at <= at)
+      this.levels[i] = change ? approach(change.from, change.target, at - change.at) : 0
+    }
+    // Drop a transition once even the last bar has reached the next one.
+    while (this.changes.length > 1 && this.changes[this.changes.length - 2].at <= oldest) this.changes.pop()
+  }
+  snap(level: number) {
+    this.levels.fill(level)
+    this.changes.length = 0
+    if (this.motion === 'travelling' && level !== 0) {
+      this.changes.push({ at: -Infinity, from: level, target: level })
     }
   }
-  /** back at rest in silence (snapped to 0): nothing moves until the next level */
   settled(): boolean {
-    if (this.target !== 0 || this.levels.some(level => level >= 0.002)) return false
-    this.levels.fill(0)
+    if (this.target !== 0 || this.changes.length > 1 || this.levels.some(level => level >= 0.002)) return false
+    this.snap(0)
     return true
   }
 }
@@ -36,8 +73,7 @@ export function barPlan(p: { reduced: boolean; paused: boolean; level: number; b
   if (still && !p.stillBars) return { heights: [0, 0, 0], alpha: [0.5, 0.5, 0.5] }
   const weights = p.bars === 3 ? [.75, 1, .75] : [.5, .75, 1, .75, .5]
   const level = still ? .7 : p.level
-  const offset = p.bars === 3 ? 1 : 0
-  const heights = weights.map((weight, i) => weight * (still ? level : levels?.[i + offset] ?? level))
+  const heights = weights.map((weight, i) => weight * (still ? level : levels?.[i] ?? level))
   return { heights, alpha: weights.map(() => .45 + .55 * level) }
 }
 
