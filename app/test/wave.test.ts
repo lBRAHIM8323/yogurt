@@ -24,13 +24,13 @@ describe('microphone meter', () => {
     }
     expect(micLevel({ me: .1, them: .79 })).toBe(0)
   })
-  it('attacks in 60ms and releases in 220ms without a scrolling delay', () => {
+  it('uses a 50 ms attack and an eased 190 ms release', () => {
     const w = new Wave()
-    w.target = 1; w.step(60)
+    w.target = 1; w.step(50)
     expect(w.level).toBeCloseTo(1 - Math.exp(-1))
     const peak = w.level
-    w.target = 0; w.step(60)
-    expect(w.level).toBeGreaterThan(peak * .75)
+    w.target = 0; w.step(190)
+    expect(w.level).toBeCloseTo(peak * Math.exp(-1))
     w.step(2000)
     expect(w.level).toBeLessThan(.001)
   })
@@ -73,6 +73,45 @@ describe('microphone meter', () => {
     expect(at(.5)).not.toBe(at(.6))
     // the bars fade in with the level even before they grow a pixel
     expect(at(0)).not.toBe(at(.02))
+  })
+  it('lets the neighbours follow at different rates while keeping the original shapes and ink', () => {
+    const w = new Wave()
+    w.target = 1
+    w.step(50)
+    const [outerLeft, left, centre, right, outerRight] = w.levels
+    expect(outerLeft).toBeLessThan(left)
+    expect(left).toBeLessThan(right)
+    expect(right).toBeLessThan(centre)
+    expect(outerRight).toBeLessThan(right)
+    for (const bars of [3, 5] as const) {
+      const plan = () => barPlan({ reduced: false, paused: false, level: w.level, bars }, w.levels)
+      const live = plan()
+      expect(live.heights).toHaveLength(bars)
+      expect(live.heights[bars >> 1]).toBe(w.level)
+      expect(live.heights[0]).toBeLessThan(live.heights[bars - 1])
+      expect(live.alpha).toEqual(Array(bars).fill(.45 + .55 * w.level))
+    }
+    w.step(4000)
+    expect(w.levels).toEqual([1, 1, 1, 1, 1])
+    w.target = 0
+    w.step(1200)
+    expect(w.level).toBeLessThan(.002)
+    expect(w.settled()).toBe(false)
+    w.step(2000)
+    expect(w.settled()).toBe(true)
+    expect(w.levels).toEqual([0, 0, 0, 0, 0])
+  })
+  it('follows the same speech at 30, 60 and 120 Hz', () => {
+    function response(frames: number) {
+      const w = new Wave()
+      for (const target of [.72, .22, .89, 0]) {
+        w.target = target
+        for (let i = 0; i < frames; i++) w.step(100 / frames)
+      }
+      return w.levels
+    }
+    const reference = response(6)
+    for (const frames of [3, 12]) response(frames).forEach((v, i) => expect(v).toBeCloseTo(reference[i], 10))
   })
   it('the meter settles at silence, and only then may its loop sleep', () => {
     const w = new Wave()

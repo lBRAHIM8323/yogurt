@@ -23,7 +23,7 @@ export function LevelBars({ height, className, testId, paused = false, bars = 5,
     const draw = (force = false) => {
       const ctx = c.getContext('2d')
       if (!ctx) return
-      const plan = barPlan({ reduced, paused, level: wave.level, bars, stillBars })
+      const plan = barPlan({ reduced, paused, level: wave.level, bars, stillBars }, wave.levels)
       // the same pixels as the last frame: nothing new for the compositor
       const key = frameKey(plan, height - BAR_W)
       if (!force && key === drawn) return
@@ -45,7 +45,7 @@ export function LevelBars({ height, className, testId, paused = false, bars = 5,
     let levelAt = performance.now()
     const off = window.yogurt.widget.onLevel((lv) => {
       wave.target = micLevel(lv); levelAt = performance.now()
-      if (reduced) { wave.level = wave.target; draw() } else if (wave.target > 0) wake()
+      if (reduced) { wave.levels.fill(wave.target); draw() } else if (wave.target > 0) wake()
     })
     let raf = 0, last = performance.now()
     // tests read whether the loop runs; set only when that changes
