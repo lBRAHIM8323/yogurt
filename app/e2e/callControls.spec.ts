@@ -16,10 +16,20 @@ test('paused recording controls fit the minimum window and keep focus inside eac
   try {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(720, 520))
     await page.locator('#workspace-actions').getByRole('button', { name: 'Start recording', exact: true }).click()
+    const stop = page.getByTestId('note-stop'), pause = page.getByTestId('note-pause')
+    const tooltip = page.getByRole('tooltip')
+    await expect(pause).toHaveAccessibleName('Pause recording')
+    await pause.locator('svg[data-icon=Pause]').hover()
+    await expect(tooltip).toHaveText('Pause recording')
+    await stop.hover()
+    await expect(tooltip).toHaveText('Stop recording')
     await page.getByTestId('note-pause').click()
     await expect(page.getByTestId('rec-mic')).toHaveText('Recording paused')
+    await page.getByTestId('note-title').hover()
+    await expect(tooltip).toHaveCount(0)
     await page.keyboard.press('Tab')
     await page.getByTestId('note-pause').focus()
+    await expect(tooltip).toHaveText('Resume recording')
     await page.screenshot({ path: testInfo.outputPath('paused-minimum.png') })
     await expect(page.getByTestId('rec-mic-chip').locator('[data-icon=Pause]')).toHaveAttribute('fill', 'currentColor')
     await expect(page.getByTestId('note-pause')).toHaveCSS('outline-offset', '-2px')
@@ -40,7 +50,22 @@ test('paused recording controls fit the minimum window and keep focus inside eac
     for (const button of await buttons.all()) {
       expect(await button.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
     }
-    await expect(page.getByTestId('note-stop')).toHaveText('Stop')
+    await expect(stop).toHaveAccessibleName('Stop recording')
+    await expect(tooltip).toHaveText('Stop recording')
+    const selected = await group.getAttribute('data-treatment')
+    expect(['neutral-icons', 'accent-icons', 'word']).toContain(selected)
+    for (const treatment of ['neutral-icons', 'accent-icons', 'word']) {
+      await group.evaluate((el, value) => { el.dataset.treatment = value }, treatment)
+      const withWord = treatment === 'word'
+      await expect(stop).toHaveText(withWord ? 'Stop' : '', { useInnerText: true })
+      const pauseBox = (await pause.boundingBox())!, stopBox = (await stop.boundingBox())!
+      expect(stopBox.height).toBe(pauseBox.height)
+      if (withWord) expect(stopBox.width).toBeGreaterThan(pauseBox.width)
+      else expect(stopBox.width).toBe(pauseBox.width)
+      const neutral = await stop.evaluate(el => getComputedStyle(el, '::before').backgroundColor === getComputedStyle(el).color)
+      expect(neutral).toBe(treatment === 'neutral-icons')
+    }
+    await group.evaluate((el, value) => { el.dataset.treatment = value! }, selected)
     await page.getByTestId('note-pause').click()
     await expect(page.getByTestId('note-state')).toHaveAttribute('data-paused', 'false')
     await expect(page.getByTestId('note-wave')).toBeVisible()
