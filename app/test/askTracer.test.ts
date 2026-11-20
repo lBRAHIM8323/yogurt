@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { createTracerSchedule, TRACER_DELAY_MS, TRACER_LAP_MS, type TracerState } from '../src/shared/askTracer'
+import { createTracerSchedule, TRACER_DELAY_MS, TRACER_DURATION_MS, type TracerState } from '../src/shared/askTracer'
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
@@ -10,14 +10,14 @@ const setup = (initial = idle) => {
   return { ...schedule, play, stop }
 }
 
-it('plays one lap after opening even with autofocus, then stays quiet while focused', () => {
+it('plays one bloom after opening even with autofocus, then stays quiet while focused', () => {
   const s = setup({ ...idle, focused: true })
   vi.advanceTimersByTime(TRACER_DELAY_MS - 1)
   s.update({ ...idle, focused: true })
   expect(s.play).not.toHaveBeenCalled()
   vi.advanceTimersByTime(1)
   expect(s.play).toHaveBeenCalledTimes(1)
-  vi.advanceTimersByTime(TRACER_LAP_MS - 1)
+  vi.advanceTimersByTime(TRACER_DURATION_MS - 1)
   expect(s.stop).not.toHaveBeenCalled()
   vi.advanceTimersByTime(1)
   expect(s.stop).toHaveBeenCalledTimes(1)
@@ -66,7 +66,7 @@ it('repeats at eight-second start-to-start intervals only while empty, unfocused
   expect(s.play).toHaveBeenCalledTimes(2)
   s.update({ ...idle, focused: true })
   expect(s.stop).toHaveBeenCalledTimes(1)
-  vi.advanceTimersByTime(TRACER_LAP_MS)
+  vi.advanceTimersByTime(TRACER_DURATION_MS)
   expect(s.stop).toHaveBeenCalledTimes(2)
   vi.advanceTimersByTime(24000)
   expect(s.play).toHaveBeenCalledTimes(2)
@@ -79,13 +79,13 @@ it('repeats at eight-second start-to-start intervals only while empty, unfocused
   s.dispose()
 })
 
-it('plays the opening lap with a pointer on the box, as after a click, but skips idle laps while it stays there', () => {
+it('plays the opening bloom with a pointer on the box, as after a click, but skips idle blooms while it stays there', () => {
   const s = setup({ ...idle, focused: true, hovered: true })
   vi.advanceTimersByTime(TRACER_DELAY_MS)
   expect(s.play).toHaveBeenCalledTimes(1)
   s.update({ ...idle, focused: true, hovered: true })
   expect(s.stop).not.toHaveBeenCalled()
-  vi.advanceTimersByTime(TRACER_LAP_MS)
+  vi.advanceTimersByTime(TRACER_DURATION_MS)
   expect(s.stop).toHaveBeenCalledTimes(1)
   s.update({ ...idle, hovered: true })
   vi.advanceTimersByTime(24000)
@@ -108,7 +108,7 @@ it('cancels the pending opening on input, including input cleared before the del
   }
 })
 
-it('disposes timers on close and gets a fresh opening lap on reopen', () => {
+it('disposes timers on close and gets a fresh opening bloom on reopen', () => {
   const first = setup()
   vi.advanceTimersByTime(TRACER_DELAY_MS / 2)
   first.dispose()
@@ -123,17 +123,18 @@ it('disposes timers on close and gets a fresh opening lap on reopen', () => {
   expect(vi.getTimerCount()).toBe(0)
 })
 
-// Both the initial invitation and a later idle lap survive active editing.
-it.each([false, true])('finishes the original lap through typing, clearing, focus and hover without restarting (idle lap %s)', later => {
+// Both the initial invitation and a later idle bloom survive active editing.
+it.each([false, true])('finishes the original bloom through typing, clearing, focus and hover without restarting (idle bloom %s)', later => {
   const s = setup()
   vi.advanceTimersByTime(TRACER_DELAY_MS + (later ? 8000 : 0))
   const plays = later ? 2 : 1, stops = later ? 1 : 0
-  vi.advanceTimersByTime(200)
+  const quarter = TRACER_DURATION_MS / 4
+  vi.advanceTimersByTime(quarter)
   s.update({ ...idle, focused: true, hovered: true, hasText: true })
-  vi.advanceTimersByTime(300)
+  vi.advanceTimersByTime(quarter)
   s.update({ ...idle, focused: true })
   s.update({ ...idle, focused: true, hasText: true })
-  vi.advanceTimersByTime(TRACER_LAP_MS - 501)
+  vi.advanceTimersByTime(TRACER_DURATION_MS - 2 * quarter - 1)
   expect(s.stop).toHaveBeenCalledTimes(stops)
   expect(s.play).toHaveBeenCalledTimes(plays)
   vi.advanceTimersByTime(1)

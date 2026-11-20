@@ -1,10 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { attachAskTracer } from '../src/renderer/src/askTracer'
-import { TRACER_DELAY_MS, TRACER_LAP_MS } from '../src/shared/askTracer'
+import { TRACER_DELAY_MS, TRACER_DURATION_MS } from '../src/shared/askTracer'
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 
-it('animates explicit dash offsets, follows the composer size, and finishes through native input and cleans up', () => {
+it('blooms in place at the original taper, follows the composer size and cleans up after native input', () => {
   vi.useFakeTimers()
   const node = () => {
     const element = {
@@ -41,14 +41,22 @@ it('animates explicit dash offsets, follows the composer size, and finishes thro
   expect(nodes[1].attrs.get('width')).toBe('348')
   expect(nodes[1].attrs.get('height')).toBe('158')
   vi.advanceTimersByTime(TRACER_DELAY_MS)
-  for (let i = 0; i < 20; i++) expect(nodes[i + 1].animate).toHaveBeenCalledWith(
-    [{ strokeDashoffset: String(-i), easing: 'cubic-bezier(.37,0,.63,1)' }, { strokeDashoffset: String(-i - 100) }], { duration: TRACER_LAP_MS, easing: 'linear' })
+  const bloom = nodes[0].animate
+  expect(bloom).toHaveBeenCalledWith([
+    { opacity: 0, easing: 'cubic-bezier(.37,0,.63,1)' },
+    { opacity: 0.85, offset: 0.4, easing: 'cubic-bezier(.37,0,.63,1)' },
+    { opacity: 0 },
+  ], { duration: 300 })
+  nodes.slice(1).forEach((segment, i) => {
+    expect(segment.style).toHaveProperty('strokeDashoffset', String(-i))
+    expect(segment.animate).not.toHaveBeenCalled()
+  })
   vi.advanceTimersByTime(200)
   field.value = 'Draft'; box.dispatchEvent(new Event('input')); tracer.update()
   bounds = { width: 350, height: 190 }; resize()
-  for (const element of nodes) expect(element.animate.mock.results[0].value.cancel).not.toHaveBeenCalled()
-  vi.advanceTimersByTime(TRACER_LAP_MS - 200)
-  for (const element of nodes) expect(element.animate.mock.results[0].value.cancel).toHaveBeenCalledOnce()
+  expect(bloom.mock.results[0].value.cancel).not.toHaveBeenCalled()
+  vi.advanceTimersByTime(TRACER_DURATION_MS - 200)
+  expect(bloom.mock.results[0].value.cancel).toHaveBeenCalledOnce()
   vi.advanceTimersByTime(24000)
   expect(nodes[0].animate).toHaveBeenCalledOnce()
   tracer.dispose()
@@ -77,7 +85,7 @@ it('plays the opening under a resting or a moving pointer, as after a click', ()
   vi.advanceTimersByTime(TRACER_DELAY_MS)
   expect(nodes[0].animate).toHaveBeenCalledOnce()
   resting.tracer.dispose()
-  // clicking Ask leaves the pointer moving over the box; the opening lap still plays, like ⌘J
+  // clicking Ask leaves the pointer moving over the box; the opening bloom still plays, like ⌘J
   const moving = open()
   moving.box.dispatchEvent(new Event('pointermove'))
   vi.advanceTimersByTime(TRACER_DELAY_MS)
