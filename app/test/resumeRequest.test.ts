@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { NoteMenu } from '../src/renderer/src/components/NoteMenu'
 import { Note } from '../src/renderer/src/screens/Note'
 import type { MeetingView, NoteView, SetupState } from '../src/shared/types'
@@ -101,11 +102,19 @@ it('drops a pending request when navigation unmounts the note, including when re
 it('waits through Stop before the summary starts and still asks before replacing an edited summary', async () => {
   meeting.state = 'recording'; notes.status = 'idle'; requested = undefined
   await render(); await render()
+  expect(find(tree, 'note-summary-tab')).toBeUndefined()
   ;(find(tree, 'note-stop')!.props.onClick as (e: { detail: number }) => void)({ detail: 0 })
   meeting = { ...meeting, state: 'stopped' }; meetingChanged()
   requested = () => { consumed(); requested = undefined }
   await render(); await render()
   expect(consumed).not.toHaveBeenCalled()
+  expect(find(tree, 'note-finishing')).toBeDefined()
+  expect(find(tree, 'note-resume')).toBeUndefined()
+  notesChanged({ ...notes, status: 'waiting' }); await render()
+  expect(find(tree, 'note-finishing')).toBeUndefined()
+  expect(find(tree, 'note-summary-tab')!.props['aria-label']).toBe('Summary, preparing')
+  expect(find(tree, 'note-resume')!.props['aria-label']).toBe('Stop summarizing')
+  expect(find(tree, 'note-resume')!.props.disabled).toBe(false)
   notesChanged({ ...notes, status: 'writing' }); await render(); await render()
   expect(consumed).not.toHaveBeenCalled()
   notesChanged({ ...notes, status: 'done', edited: true }); await render(); await render()
@@ -155,14 +164,30 @@ it('waits for the first notes model but allows generation during an optional upg
 })
 
 
+it('can cancel summary preparation while the transcript is still processing', async () => {
+  meeting.transcriptionState = 'transcribing'; notes.status = 'waiting'; requested = undefined
+  await render(); await render()
+  const stop = find(tree, 'note-resume')!
+  expect(stop.props['aria-label']).toBe('Stop summarizing')
+  expect(stop.props.disabled).toBe(false)
+  ;(stop.props.onClick as () => void)()
+  expect(stopSummary).toHaveBeenCalledExactlyOnceWith(meeting.id)
+  notesChanged({ ...notes, status: 'stopped' }); await render()
+  expect(find(tree, 'note-resume')).toBeUndefined()
+  expect(resume).not.toHaveBeenCalled()
+})
+
 it.each(['waiting', 'writing', 'failed', 'empty', 'stopped', 'done'] as const)('the header action for %s stops a summary or resumes recording without confusing the two', async status => {
   notes.status = status; requested = undefined
   await render(); await render()
   const busy = status === 'waiting' || status === 'writing'
   const button = find(tree, 'note-resume')!
   expect(button.props.disabled).toBe(false)
-  expect(button.props['aria-label']).toBe(busy ? 'Stop summary' : 'Resume recording')
-  expect(button.props['aria-busy']).toBe(busy)
+  expect(button.props['aria-label']).toBe(busy ? 'Stop summarizing' : 'Resume recording')
+  expect(button.props['aria-busy']).toBeUndefined()
+  const summary = find(tree, 'note-summary-tab')!
+  expect(summary.props['aria-label']).toBe(status === 'waiting' ? 'Summary, preparing' : status === 'writing' ? 'Summary, writing' : undefined)
+  expect(renderToStaticMarkup(summary).includes('summary-writing-mark')).toBe(busy)
   ;(button.props.onClick as () => void)()
   await render(); await render()
   if (busy) {

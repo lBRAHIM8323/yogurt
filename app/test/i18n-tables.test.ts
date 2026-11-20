@@ -12,7 +12,7 @@ const blanks = (s: string) => [...new Set(s.match(/\{\w+\}/g) ?? [])].sort()
 const forms = (e: Entry) => (typeof e === 'string' ? [e] : Object.values(e))
 
 it('translates summary cancellation and its restart state in every locale', () => {
-  for (const { id } of LOCALES) for (const key of ['Stop summary', 'Summary stopped.', 'Generate summary']) {
+  for (const { id } of LOCALES) for (const key of ['Stop summarizing', 'Summary, preparing', 'Summary, writing', 'Summary stopped.', 'Generate summary']) {
     expect(keys).toContain(key)
     if (id === 'en' && key === 'Generate summary') continue
     expect(load(id)[key]).toBeTypeOf('string')

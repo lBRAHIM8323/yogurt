@@ -699,7 +699,9 @@
   "Note for the summary": "Ohje yhteenvedolle",
   "Add a note, like shorter or in Spanish": "Lisää ohje, kuten lyhyemmin tai espanjaksi",
   "Waiting for Yogurt AI to download": "Odotetaan Yogurt AI:n latausta",
-  "Stop summary": "Pysäytä yhteenveto",
+  "Stop summarizing": "Lopeta yhteenvedon laatiminen",
+  "Summary, preparing": "Yhteenveto, valmistelu käynnissä",
+  "Summary, writing": "Yhteenveto, kirjoitus käynnissä",
   "Summary stopped.": "Yhteenvedon luonti pysäytetty.",
   "This window couldn't be displayed.": "Tätä ikkunaa ei voitu näyttää.",
   "{current} of {count}": {

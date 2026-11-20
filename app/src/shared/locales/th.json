@@ -651,7 +651,9 @@
   "Note for the summary": "คำสั่งสำหรับสรุป",
   "Add a note, like shorter or in Spanish": "เพิ่มคำสั่ง เช่น สั้นลงหรือเป็นภาษาสเปน",
   "Waiting for Yogurt AI to download": "รอการดาวน์โหลด Yogurt AI",
-  "Stop summary": "หยุดสรุป",
+  "Stop summarizing": "หยุดเขียนสรุป",
+  "Summary, preparing": "สรุป กำลังเตรียม",
+  "Summary, writing": "สรุป กำลังเขียน",
   "Summary stopped.": "หยุดสรุปแล้ว",
   "This window couldn't be displayed.": "ไม่สามารถแสดงหน้าต่างนี้ได้",
   "{current} of {count}": {
